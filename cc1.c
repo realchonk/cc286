@@ -437,8 +437,13 @@ struct dtype *dt;
 
 /* SYMBOLS */
 
+enum namespace {
+	NS_VAR,
+};
+
 struct symbol {
 	struct symbol *next;
+	enum namespace ns;
 	char id[MAXIDENT + 1];
 	struct dtype *dt;
 	int reg;
@@ -447,27 +452,29 @@ struct symbol {
 static struct symbol *fvars = NULL, *gvars = NULL;
 
 struct symbol *
-lookup_in (head, id)
+lookup_in (head, id, ns)
 struct symbol *head;
 char *id;
+enum namespace ns;
 {
 	for (; head != NULL; head = head->next) {
-		if (strcmp (head->id, id) == 0)
+		if (ns == head->ns && strcmp (head->id, id) == 0)
 			return head;
 	}
 	return NULL;
 }
 
 struct symbol *
-lookup (id)
+lookup (id, ns)
 char *id;
+enum namespace ns;
 {
 	struct symbol *sym;
 
-	if ((sym = lookup_in (fvars, id)) != NULL)
+	if ((sym = lookup_in (fvars, id, ns)) != NULL)
 		return sym;
 
-	if ((sym = lookup_in (gvars, id)) != NULL)
+	if ((sym = lookup_in (gvars, id, ns)) != NULL)
 		return sym;
 
 	return NULL;
@@ -515,7 +522,7 @@ atom ()
 		printf ("\tlet $%d: word = %ld;\n", r, lval.i);
 		break;
 	case TOK_IDENT:
-		sym = lookup (lval.id);
+		sym = lookup (lval.id, NS_VAR);
 		if (sym == NULL) {
 			if (match (TOK_COLON)) {
 				printf ("\tjmp %s;\n", lval.id);
@@ -1095,7 +1102,6 @@ struct symbol *sym;
 	expect (TOK_RCURLY);
 	printf ("}\n\n");
 	reset_regs ();
-
 }
 
 int
