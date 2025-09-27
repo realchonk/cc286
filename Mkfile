@@ -1,0 +1,15 @@
+CC ?= cc
+CFLAGS += -ansi -O2 -Wall -Wextra -Wno-deprecated-non-prototype
+LDFLAGS +=
+
+all: cc1
+
+run: cc1
+	cat test.c
+	./cc1 < test.c
+
+clean:
+	rm -f cc1
+
+.c:
+	${CC} -o $@ $< ${CFLAGS} ${LDFLAGS}
