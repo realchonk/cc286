@@ -893,9 +893,19 @@ tern ()
 }
 
 int
+comma ()
+{
+	int r;
+	do {
+		r = tern ();
+	} while (match (TOK_COMMA));
+	return r;
+}
+
+int
 expr ()
 {
-	return tern ();
+	return comma ();
 }
 
 #define F_SIGNED 0x01
@@ -1115,7 +1125,7 @@ func ()
 		stmt ();
 
 	expect (TOK_RCURLY);
-	printf ("}\n");
+	printf ("}\n\n");
 	reset_regs ();
 }
 
