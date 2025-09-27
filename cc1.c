@@ -48,6 +48,7 @@ enum token_type {
 	KW_SHORT,
 	KW_INT,
 	KW_LONG,
+	KW_GOTO,
 
 	TOK_EOF,
 };
@@ -103,6 +104,8 @@ begin:	do {
 			return KW_INT;
 		} else if (strcmp (lval.id, "long") == 0) {
 			return KW_LONG;
+		} else if (strcmp (lval.id, "goto") == 0) {
+			return KW_GOTO;
 		} else {
 			return TOK_IDENT;
 		}
@@ -467,7 +470,7 @@ char *id;
 	if ((sym = lookup_in (gvars, id)) != NULL)
 		return sym;
 
-	errx (1, "invalid symbol: %s", id);
+	return NULL;
 }
 
 /* PARSER */
@@ -513,6 +516,14 @@ atom ()
 		break;
 	case TOK_IDENT:
 		sym = lookup (lval.id);
+		if (sym == NULL) {
+			if (match (TOK_COLON)) {
+				printf ("\tjmp %s;\n", lval.id);
+				printf ("\n%s:\n", lval.id);
+				return -1;
+			}
+			errx (1, "invalid symbol: %s", lval.id);
+		}
 		if (sym->reg != -1) {
 			r = sym->reg;
 		} else {
@@ -997,8 +1008,19 @@ stmt ()
 		}
 		expect (TOK_SEMI);
 		break;
+	case KW_GOTO:
+		next ();
+		expect (TOK_IDENT);
+		printf ("\tjmp %s;\n", lval.id);
+		expect (TOK_SEMI);
+		break;
+	case TOK_SEMI:
+		next ();
+		break;
 	default:
 		r = expr ();
+		if (r != -1)
+			expect (TOK_SEMI);
 		break;
 	}
 }

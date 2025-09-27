@@ -42,8 +42,15 @@ get_global ()
 	return global;
 }
 
+// the following are examples of cursed things this compiler allows:
+
 int var, func () {
 	return var;
 }
 
 
+labels ()
+{
+	goto lbl;
+	return lbl:, 0;
+}
