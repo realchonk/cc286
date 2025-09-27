@@ -1003,12 +1003,32 @@ stmt ()
 	}
 }
 
+enum level {
+	L_GLOBAL_TOP,
+	L_GLOBAL,
+	// L_ARGS,
+	L_LOCAL,
+};
+
+enum level
+lvl_decay (lvl)
+enum level lvl;
+{
+	switch (lvl) {
+	case L_GLOBAL_TOP:
+		return L_GLOBAL;
+	default:
+		return lvl;
+	}
+}
+
 void
-decl2 (dt, sym)
+decl2 (dt, sym, lvl)
 struct dtype **dt;
 struct symbol *sym;
+enum level lvl;
 {
-	extern void decl1 ();
+	extern int decl1 ();
 
 	switch (next ()) {
 	case TOK_IDENT:
@@ -1017,10 +1037,10 @@ struct symbol *sym;
 		break;
 	case TOK_STAR:
 		*dt = ptr_dt (*dt, 0);
-		decl2 (dt, sym);
+		decl2 (dt, sym, lvl);
 		break;
 	case TOK_LPAR:
-		decl1 (dt, sym);
+		decl1 (dt, sym, lvl_decay (lvl));
 		expect (TOK_RPAR);
 		break;
 	default:
@@ -1028,98 +1048,24 @@ struct symbol *sym;
 	}
 }
 
+int
+is_func_begin ()
+{
+	return peek () == TOK_LCURLY;
+}
+
 void
-decl1 (dt, sym)
-struct dtype **dt;
+func (sym)
 struct symbol *sym;
 {
-	struct dtype *ndt;
+	int decl ();
 
-	decl2 (dt, sym);
-
-	if (match (TOK_LPAR)) {
-		expect (TOK_RPAR);
-		ndt = new (struct dtype);
-		ndt->type = DT_FUNC;
-		ndt->inner = sym->dt;
-		ndt->refcnt = 1;
-		sym->dt = ndt;
-	}
-
-	// TODO: arrays
-}
-
-int
-decl ()
-{
-	struct symbol *sym;
-	struct dtype *dt, *dt2;
-
-	switch (peek ()) {
-	case KW_SIGNED:
-	case KW_UNSIGNED:
-	case KW_CHAR:
-	case KW_SHORT:
-	case KW_INT:
-	case KW_LONG:
-		break;
-	default:
-		return 0;
-	}
-	dt = dtype ();
-	
-	do {
-		sym = new (struct symbol);
-		sym->next = fvars;
-		dt2 = copy_dt (dt);
-		decl1 (&dt2, sym);
-		fvars = sym;
-
-		switch (sym->dt->type) {
-		case DT_PTR:
-			sym->reg = alloc_reg (sym->dt, 1);
-			printf ("\tlet $%d: ptr = alloc %d;\t# %s\n",
-				sym->reg, sizeof_dt (sym->dt->inner), sym->id);
-			break;
-		case DT_FUNC:
-			sym->reg = -1;
-			printf ("\t# extern %s;\n", sym->id);
-			break;
-		default:
-			abort ();
-		}
-	} while (match (TOK_COMMA));
-
-	free_dt (dt);
-
-	expect (TOK_SEMI);
-	return 1;
-}
-
-void
-func ()
-{
-	struct symbol *sym;
-
-	expect (TOK_IDENT);
-
-	sym = new (struct symbol);
-	sym->next = gvars;
-	sym->dt = new (struct dtype);
-	sym->dt->type = DT_FUNC;
-	sym->dt->inner = copy_dt (&dt_int);
-	sym->dt->refcnt = 1;
-	copyident (sym->id, lval.id);
-	sym->reg = -1;
 	gvars = sym;
-
-	expect (TOK_LPAR);
-	expect (TOK_RPAR);
 
 	printf ("fn %s() {\n", sym->id);
 
 	expect (TOK_LCURLY);
-	while (decl ());
+	while (decl (L_LOCAL));
 
 	while (peek () != TOK_RCURLY)
 		stmt ();
@@ -1127,13 +1073,139 @@ func ()
 	expect (TOK_RCURLY);
 	printf ("}\n\n");
 	reset_regs ();
+
 }
+
+int
+decl1 (dt, sym, lvl)
+struct dtype **dt;
+struct symbol *sym;
+enum level lvl;
+{
+	struct dtype *ndt;
+
+	decl2 (dt, sym, lvl);
+
+	if (match (TOK_LPAR)) {
+		// TODO: arguments
+		expect (TOK_RPAR);
+		ndt = new (struct dtype);
+		ndt->type = DT_FUNC;
+		ndt->inner = sym->dt;
+		ndt->refcnt = 1;
+		sym->dt = ndt;
+
+		if (lvl == L_GLOBAL_TOP && is_func_begin ()) {
+			func (sym);
+			return 1;
+		}
+
+	}
+
+	// TODO: arrays
+
+	return 0;
+}
+
+struct dtype *
+try_dtype ()
+{
+	switch (peek ()) {
+	case KW_SIGNED:
+	case KW_UNSIGNED:
+	case KW_CHAR:
+	case KW_SHORT:
+	case KW_INT:
+	case KW_LONG:
+		return dtype ();
+	default:
+		return NULL;
+	}
+}
+
+int
+decl (lvl)
+enum level lvl;
+{
+	struct symbol *sym;
+	struct dtype *dt, *dt2;
+
+	dt = try_dtype ();
+	if (dt == NULL) {
+		if (lvl == L_GLOBAL || lvl == L_GLOBAL_TOP) {
+			dt = copy_dt (&dt_int);
+		} else {
+			return 0;
+		}
+	}
+	
+	do {
+		sym = new (struct symbol);
+		switch (lvl) {
+		case L_GLOBAL_TOP:
+		case L_GLOBAL:
+			sym->next = gvars;
+			break;
+		case L_LOCAL:
+			sym->next = fvars;
+			break;
+		}
+		dt2 = copy_dt (dt);
+
+		if (decl1 (&dt2, sym, lvl)) {
+			free_dt (dt);
+			return 1;
+		} else {
+			switch (lvl) {
+			case L_GLOBAL_TOP:
+			case L_GLOBAL:
+				gvars = sym;
+				switch (sym->dt->type) {
+				case DT_PTR:
+					printf ("static %s: ", sym->id);
+					print_dt (sym->dt->inner);
+					printf (";\n\n");
+					break;
+				case DT_FUNC:
+					printf ("# extern %s;\n", sym->id);
+					break;
+				default:
+					abort ();
+				}
+				sym->reg = -1;
+				break;
+			case L_LOCAL:
+				fvars = sym;
+				switch (sym->dt->type) {
+				case DT_PTR:
+					sym->reg = alloc_reg (sym->dt, 1);
+					printf ("\tlet $%d: ptr = alloc %d;\t# %s\n",
+							sym->reg, sizeof_dt (sym->dt->inner), sym->id);
+					break;
+				case DT_FUNC:
+					sym->reg = -1;
+					printf ("\t# extern %s;\n", sym->id);
+					break;
+				default:
+					abort ();
+				}
+				break;
+			}
+		}
+
+	} while (match (TOK_COMMA));
+
+	free_dt (dt);
+	expect (TOK_SEMI);
+	return 1;
+}
+
 
 int main ()
 {
 	cm = CM_SMALL;
 	memset (regs, 0, sizeof (regs));
 	while (peek () != TOK_EOF) {
-		func ();
+		decl (L_GLOBAL_TOP);
 	}
 }

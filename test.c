@@ -1,3 +1,5 @@
+int global;
+
 main ()
 {
 	char c, (c2);
@@ -33,3 +35,15 @@ ptrsub ()
 	return p1 - p2;
 	return p1 - x;
 }
+
+int
+get_global ()
+{
+	return global;
+}
+
+int var, func () {
+	return var;
+}
+
+
