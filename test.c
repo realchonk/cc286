@@ -54,3 +54,16 @@ labels ()
 	goto lbl;
 	return lbl:, 0;
 }
+
+
+enum {
+	A,
+	B,
+} x;
+
+enums ()
+{
+	return A;
+	return B;
+	return x;
+}
