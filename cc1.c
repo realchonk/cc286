@@ -495,6 +495,7 @@ put_sym (head, sym)
 struct symbol **head, *sym;
 {
 	assert (sym->sym_next == NULL);
+	assert (sym->sym_id[0] != '\0');
 	sym->sym_next = *head;
 	*head = sym;
 }
@@ -1212,7 +1213,7 @@ struct symbol *sym;
 
 	/* TODO: free fvars */
 	fvars = NULL;
-	gvars = sym;
+	put_sym (&gvars, sym);
 
 	printf ("fn %s() {\n", sym->sym_id);
 
@@ -1252,7 +1253,6 @@ enum level lvl;
 			func (sym);
 			return 1;
 		}
-
 	}
 
 	/* TODO: arrays */
@@ -1281,48 +1281,48 @@ enum level lvl;
 
 	do {
 		sym = new (struct symbol);
-		sym->sym_next = *scope;
 		dt2 = copy_dt (dt);
 
 		if (decl1 (&dt2, sym, lvl)) {
 			free_dt (dt);
 			return 1;
-		} else {
-			switch (lvl) {
-			case LVL_GLOBAL_TOP:
-			case LVL_GLOBAL:
-				switch (sym->sym_dt->dt_type) {
-				case DT_PTR:
-					printf ("static %s: ", sym->sym_id);
-					print_dt (sym->sym_dt->dt_inner);
-					printf (";\n\n");
-					break;
-				case DT_FUNC:
-					printf ("# extern %s;\n", sym->sym_id);
-					break;
-				default:
-					abort ();
-				}
-				sym->sym_reg = SYM_NAMED;
-				break;
-			case LVL_LOCAL:
-				switch (sym->sym_dt->dt_type) {
-				case DT_PTR:
-					sym->sym_reg = alloc_reg (sym->sym_dt, 1);
-					printf ("\tlet $%d: ptr = alloc %d;\t# %s\n",
-						sym->sym_reg, sizeof_dt (sym->sym_dt->dt_inner), sym->sym_id);
-					break;
-				case DT_FUNC:
-					sym->sym_reg = SYM_NAMED;
-					printf ("\t# extern %s;\n", sym->sym_id);
-					break;
-				default:
-					abort ();
-				}
-				break;
-			}
 		}
-		*scope = sym;
+
+		switch (lvl) {
+		case LVL_GLOBAL_TOP:
+		case LVL_GLOBAL:
+			switch (sym->sym_dt->dt_type) {
+			case DT_PTR:
+				printf ("static %s: ", sym->sym_id);
+				print_dt (sym->sym_dt->dt_inner);
+				printf (";\n\n");
+				break;
+			case DT_FUNC:
+				printf ("# extern %s;\n", sym->sym_id);
+				break;
+			default:
+				abort ();
+			}
+			sym->sym_reg = SYM_NAMED;
+			break;
+		case LVL_LOCAL:
+			switch (sym->sym_dt->dt_type) {
+			case DT_PTR:
+				sym->sym_reg = alloc_reg (sym->sym_dt, 1);
+				printf ("\tlet $%d: ptr = alloc %d;\t# %s\n",
+					sym->sym_reg, sizeof_dt (sym->sym_dt->dt_inner), sym->sym_id);
+				break;
+			case DT_FUNC:
+				sym->sym_reg = SYM_NAMED;
+				printf ("\t# extern %s;\n", sym->sym_id);
+				break;
+			default:
+				abort ();
+			}
+			break;
+		}
+
+		put_sym (scope, sym);
 	} while (match (TOK_COMMA));
 
 end:
@@ -1334,10 +1334,10 @@ end:
 
 int main ()
 {
-	scope = &gvars;
 	cm = CM_SMALL;
 	memset (regs, 0, sizeof (regs));
 	while (peek () != TOK_EOF) {
+		scope = &gvars;
 		decl (LVL_GLOBAL_TOP);
 	}
 	return 0;
