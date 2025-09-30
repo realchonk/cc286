@@ -1310,4 +1310,5 @@ int main ()
 	while (peek () != TOK_EOF) {
 		decl (L_GLOBAL_TOP);
 	}
+	return 0;
 }
