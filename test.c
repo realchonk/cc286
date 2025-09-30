@@ -75,3 +75,13 @@ enums ()
 	return B;
 	return lvl;
 }
+
+struct stat {
+	unsigned short	st_mode;
+	unsigned long	st_size;
+};
+
+structs ()
+{
+	struct stat st, *st_ptr;
+}
