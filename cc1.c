@@ -225,13 +225,16 @@ enum dtype_type {
 };
 
 struct dtype {
-	enum dtype_type type;
-	int refcnt;
-	struct dtype *inner;
+	enum dtype_type		 dt_type;
+	int			 dt_refcnt;
+	union {
+		struct dtype	*dtv_inner;
+	} dt_v;
 };
 
+#define dt_inner dt_v.dtv_inner
 
-#define builtin(ty) { ty, 1, NULL }
+#define builtin(ty) { ty, 1, { NULL } }
 static struct dtype dt_lbl	= builtin (DT_LBL);
 static struct dtype dt_char	= builtin (DT_CHAR);
 static struct dtype dt_schar	= builtin (DT_SCHAR);
@@ -247,7 +250,7 @@ struct dtype *
 copy_dt (dt)
 struct dtype *dt;
 {
-	dt->refcnt++;
+	dt->dt_refcnt++;
 	return dt;
 }
 
@@ -255,7 +258,7 @@ void
 print_dt (dt)
 struct dtype *dt;
 {
-	switch (dt->type) {
+	switch (dt->dt_type) {
 	case DT_NULL:
 		unreachable ("DT_NULL");
 	case DT_LBL:
@@ -291,8 +294,8 @@ enum dtype_type type;
 {
 	struct dtype *dt;
 	dt = new (struct dtype);
-	dt->type = type;
-	dt->refcnt = 1;
+	dt->dt_type = type;
+	dt->dt_refcnt = 1;
 	return dt;
 }
 
@@ -300,16 +303,16 @@ void
 free_dt (dt)
 struct dtype *dt;
 {
-	--dt->refcnt;
-	if (dt->refcnt != 0)
+	--dt->dt_refcnt;
+	if (dt->dt_refcnt != 0)
 		return;
 
-	switch (dt->type) {
+	switch (dt->dt_type) {
 	case DT_NULL:
 		unreachable ("DT_NULL");
 	case DT_PTR:
 	case DT_FUNC:
-		free_dt (dt->inner);
+		free_dt (dt->dt_inner);
 		break;
 	case DT_LBL:
 	case DT_CHAR:
@@ -330,7 +333,7 @@ int
 sizeof_dt (dt)
 struct dtype *dt;
 {
-	switch (dt->type) {
+	switch (dt->dt_type) {
 	case DT_NULL:
 		unreachable ("DT_NULL");
 	case DT_PTR:
@@ -372,10 +375,10 @@ struct dtype *inner;
 	struct dtype *ptr;
 
 	ptr = new_dt (DT_PTR);
-	ptr->inner = inner;
+	ptr->dt_inner = inner;
 
 	if (inc)
-		++inner->refcnt;
+		++inner->dt_refcnt;
 
 	return ptr;
 }
@@ -384,12 +387,12 @@ void
 assert_dt_eq (dta, dtb)
 struct dtype *dta, *dtb;
 {
-	assert (dta->type == dtb->type);
+	assert (dta->dt_type == dtb->dt_type);
 
-	switch (dta->type) {
+	switch (dta->dt_type) {
 	case DT_PTR:
 	case DT_FUNC:
-		return assert_dt_eq (dta->inner, dtb->inner);
+		return assert_dt_eq (dta->dt_inner, dtb->dt_inner);
 	default:
 		break;
 	}
@@ -399,7 +402,7 @@ int
 is_signed (dt)
 struct dtype *dt;
 {
-	switch (dt->type) {
+	switch (dt->dt_type) {
 	case DT_CHAR:
 	case DT_SCHAR:
 	case DT_SHORT:
@@ -508,13 +511,13 @@ rvalue (r)
 	int x;
 
 	reg = &regs[r];
-	if (!reg->r_is_lv || reg->r_dt->type == DT_FUNC) 
+	if (!reg->r_is_lv || reg->r_dt->dt_type == DT_FUNC) 
 		return r;
 
-	assert (reg->r_dt->type == DT_PTR);
-	x = alloc_reg (copy_dt (reg->r_dt->inner), 0);
+	assert (reg->r_dt->dt_type == DT_PTR);
+	x = alloc_reg (copy_dt (reg->r_dt->dt_inner), 0);
 	printf ("\tlet $%d: ", x);
-	print_dt (reg->r_dt->inner);
+	print_dt (reg->r_dt->dt_inner);
 	printf (" = read $%d;\n", r);
 	return x;
 }
@@ -627,7 +630,7 @@ promote (a)
 
 	adt = regs[a].r_dt;
 
-	switch (adt->type) {
+	switch (adt->dt_type) {
 	case DT_NULL:
 	case DT_LBL:
 		unreachable ("DT_NULL or DT_LBL");
@@ -673,24 +676,24 @@ int *a, *b;
 	dta = regs[*a].r_dt;
 	dtb = regs[*b].r_dt;
 
-	if (dta->type == dtb->type)
+	if (dta->dt_type == dtb->dt_type)
 		return;
 
-	if (dta->type == DT_ULONG) {
+	if (dta->dt_type == DT_ULONG) {
 		t = alloc_reg (copy_dt (&dt_ulong), 0);
 		printf ("\tlet $%d: dword = zext $%d;\n", t, *b);
 		*b = t;
 		return;
 	}
 
-	if (dtb->type == DT_ULONG) {
+	if (dtb->dt_type == DT_ULONG) {
 		t = alloc_reg (copy_dt (&dt_ulong), 0);
 		printf ("\tlet $%d: dword = zext $%d;\n", t, *a);
 		*a = t;
 		return;
 	}
 
-	if (dta->type == DT_LONG && dtb->type == DT_UINT) {
+	if (dta->dt_type == DT_LONG && dtb->dt_type == DT_UINT) {
 		t = alloc_reg (copy_dt (&dt_ulong), 0);
 		u = alloc_reg (copy_dt (&dt_ulong), 0);
 		printf ("\tlet $%d: dword = $%d;\n", t, *a);
@@ -700,7 +703,7 @@ int *a, *b;
 		return;
 	}
 
-	if (dta->type == DT_UINT && dtb->type == DT_LONG) {
+	if (dta->dt_type == DT_UINT && dtb->dt_type == DT_LONG) {
 		t = alloc_reg (copy_dt (&dt_ulong), 0);
 		u = alloc_reg (copy_dt (&dt_ulong), 0);
 		printf ("\tlet $%d: dword = zext $%d;\n", t, *a);
@@ -710,32 +713,32 @@ int *a, *b;
 		return;
 	}
 
-	if (dta->type == DT_LONG) {
-		assert (dtb->type == DT_INT);
+	if (dta->dt_type == DT_LONG) {
+		assert (dtb->dt_type == DT_INT);
 		t = alloc_reg (copy_dt (&dt_long), 0);
 		printf ("\tlet $%d: dword = sext $%d;\n", t, *b);
 		*b = t;
 		return;
 	}
 
-	if (dtb->type == DT_LONG) {
-		assert (dta->type == DT_INT);
+	if (dtb->dt_type == DT_LONG) {
+		assert (dta->dt_type == DT_INT);
 		t = alloc_reg (copy_dt (&dt_long), 0);
 		printf ("\tlet $%d: dword = sext $%d;\n", t, *a);
 		*a = t;
 		return;
 	}
 
-	if (dta->type == DT_UINT) {
-		assert (dtb->type == DT_INT);
+	if (dta->dt_type == DT_UINT) {
+		assert (dtb->dt_type == DT_INT);
 		t = alloc_reg (copy_dt (&dt_uint), 0);
 		printf ("\tlet $%d: word = $%d;\n", t, *b);
 		*b = t;
 		return;
 	}
 
-	if (dtb->type == DT_UINT) {
-		assert (dta->type == DT_INT);
+	if (dtb->dt_type == DT_UINT) {
+		assert (dta->dt_type == DT_INT);
 		t = alloc_reg (copy_dt (&dt_uint), 0);
 		printf ("\tlet $%d: word = $%d;\n", t, *a);
 		*a = t;
@@ -743,7 +746,7 @@ int *a, *b;
 	}
 
 	/* should be unreachable */
-	errx (1, "dta=%d, dtb=%d", dta->type, dtb->type);
+	errx (1, "dta=%d, dtb=%d", dta->dt_type, dtb->dt_type);
 }
 
 int
@@ -758,9 +761,9 @@ do_ptr_add (ptr, off)
 	dtp = regs[ptr].r_dt;
 	dto = regs[off].r_dt;
 
-	assert (dtp->type == DT_PTR);
+	assert (dtp->dt_type == DT_PTR);
 
-	switch (dto->type) {
+	switch (dto->dt_type) {
 	case DT_INT:
 	case DT_UINT:
 		break;
@@ -768,10 +771,10 @@ do_ptr_add (ptr, off)
 	case DT_ULONG:
 		errx (1, "TODO: add ptr + (u)long");
 	default:
-		errx (1, "cannot add ptr and %d", dto->type);
+		errx (1, "cannot add ptr and %d", dto->dt_type);
 	}
 
-	sz = sizeof_dt (dtp->inner);
+	sz = sizeof_dt (dtp->dt_inner);
 	off2 = alloc_reg (copy_dt (dto), 0);
 	printf ("\tlet $%d: ", off2);
 	print_dt (dto);
@@ -790,16 +793,16 @@ do_add (a, b)
 	struct dtype *dt;
 	int r;
 
-	if (regs[a].r_dt->type == DT_PTR) {
+	if (regs[a].r_dt->dt_type == DT_PTR) {
 		r = do_ptr_add (a, b);
-	} else if (regs[b].r_dt->type == DT_PTR) {
+	} else if (regs[b].r_dt->dt_type == DT_PTR) {
 		r = do_ptr_add (b, a);
 	} else {
 		promote2 (&a, &b);
 		dt = regs[a].r_dt;
 		r = alloc_reg (copy_dt (dt), 0);
 
-		switch (dt->type) {
+		switch (dt->dt_type) {
 		case DT_INT:
 		case DT_UINT:
 		case DT_LONG:
@@ -826,17 +829,17 @@ do_sub (a, b)
 	dta = regs[a].r_dt;
 	dtb = regs[b].r_dt;
 
-	if (dta->type == DT_PTR && dtb->type == DT_PTR) {
+	if (dta->dt_type == DT_PTR && dtb->dt_type == DT_PTR) {
 		assert_dt_eq (dta, dtb);
-		sz = sizeof_dt (dta->inner);
+		sz = sizeof_dt (dta->dt_inner);
 
 		t = alloc_reg (copy_dt (&dt_int), 0);
 		printf ("\tlet $%d: word = sub $%d, $%d;\n", t, a, b);
 		r = alloc_reg (copy_dt (&dt_int), 0);
 		printf ("\tlet $%d: word = udiv $%d, %d;\n", r, t, sz);
-	} else if (dta->type == DT_PTR) {
-		sz = sizeof_dt (dta->inner);
-		switch (dtb->type) {
+	} else if (dta->dt_type == DT_PTR) {
+		sz = sizeof_dt (dta->dt_inner);
+		switch (dtb->dt_type) {
 		case DT_INT:
 		case DT_UINT:
 			instr = is_signed (dtb) ? "smul" : "umul";
@@ -846,14 +849,14 @@ do_sub (a, b)
 			printf ("\tlet $%d: ptr = sub $%d, $%d;\n", r, a, t);
 			break;
 		default:
-			errx (1, "cannot subtract %d from ptr", dtb->type);
+			errx (1, "cannot subtract %d from ptr", dtb->dt_type);
 		}
 	} else {
 		promote2 (&a, &b);
 		dt = regs[a].r_dt;
 		r = alloc_reg (copy_dt (dt), 0);
 
-		switch (dt->type) {
+		switch (dt->dt_type) {
 		case DT_INT:
 		case DT_UINT:
 		case DT_LONG:
@@ -1226,7 +1229,7 @@ enum level lvl;
 		/* TODO: arguments */
 		expect (TOK_RPAR);
 		ndt = new_dt (DT_FUNC);
-		ndt->inner = sym->dt;
+		ndt->dt_inner = sym->dt;
 		sym->dt = ndt;
 
 		if (lvl == L_GLOBAL_TOP && is_func_begin ()) {
@@ -1272,10 +1275,10 @@ enum level lvl;
 			switch (lvl) {
 			case L_GLOBAL_TOP:
 			case L_GLOBAL:
-				switch (sym->dt->type) {
+				switch (sym->dt->dt_type) {
 				case DT_PTR:
 					printf ("static %s: ", sym->id);
-					print_dt (sym->dt->inner);
+					print_dt (sym->dt->dt_inner);
 					printf (";\n\n");
 					break;
 				case DT_FUNC:
@@ -1287,11 +1290,11 @@ enum level lvl;
 				sym->reg = SYM_NAMED;
 				break;
 			case L_LOCAL:
-				switch (sym->dt->type) {
+				switch (sym->dt->dt_type) {
 				case DT_PTR:
 					sym->reg = alloc_reg (sym->dt, 1);
 					printf ("\tlet $%d: ptr = alloc %d;\t# %s\n",
-							sym->reg, sizeof_dt (sym->dt->inner), sym->id);
+							sym->reg, sizeof_dt (sym->dt->dt_inner), sym->id);
 					break;
 				case DT_FUNC:
 					sym->reg = SYM_NAMED;
