@@ -88,4 +88,8 @@ structs ()
 		long z;
 	} u, *u_ptr;
 	struct stat st, *st_ptr;
+
+	return st.st_mode;
+	return &st.st_size;
+	return u.x + u.z;
 }

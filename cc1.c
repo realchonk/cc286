@@ -42,6 +42,7 @@ enum token_type {
 	TOK_COMMA,
 	TOK_QMARK,
 	TOK_COLON,
+	TOK_PERIOD,
 
 	KW_RETURN,
 	KW_SIGNED,
@@ -163,6 +164,8 @@ begin:	do {
 		return TOK_QMARK;
 	case ':':
 		return TOK_COLON;
+	case '.':
+		return TOK_PERIOD;
 	case EOF:
 		return TOK_EOF;
 	default:
@@ -240,9 +243,9 @@ enum dtype_type {
 };
 
 struct structure {
-	char		  su_id[MAXIDENT + 1];
-	struct symbol	**su_members;
-	size_t		  su_size;
+	char		 su_id[MAXIDENT + 1];
+	struct symbol	*su_members;
+	size_t		 su_size;
 };
 
 struct dtype {
@@ -590,6 +593,7 @@ lvalue (r)
 {
 	if (!regs[r].r_is_lv)
 		errx (1, "must be an lvalue");
+	assert (regs[r].r_dt->dt_type == DT_PTR);
 	return r;
 }
 
@@ -610,8 +614,8 @@ atom ()
 		sym = lookup (lval.id, NS_VAR);
 		if (sym == NULL) {
 			if (match (TOK_COLON)) {
-				printf ("\tjmp %s;\n", lval.id);
-				printf ("\n%s:\n", lval.id);
+				printf ("\tjmp %s;\n\n", lval.id);
+				printf ("%s:\n", lval.id);
 				return -1;
 			}
 			errx (1, "invalid symbol: %s", lval.id);
@@ -642,6 +646,31 @@ atom ()
 		break;
 	default:
 		errx (1, "expected expression");
+	}
+
+	return r;
+}
+
+int member ()
+{
+	struct symbol	*sym;
+	struct dtype	*dt;
+	int		 r, s;
+
+	r = atom ();
+
+	if (match (TOK_PERIOD)) {
+		s = lvalue (r);
+		dt = regs[r].r_dt->dt_inner;
+		assert (dt->dt_type == DT_STRUCT || dt->dt_type == DT_UNION);
+
+		expect (TOK_IDENT);
+		sym = lookup_in (dt->dt_su->su_members, lval.id, NS_VAR);
+		if (sym == NULL)
+			errx (1, "no member '%s' for struct/union '%s'", lval.id, dt->dt_su->su_id);
+
+		r = alloc_reg (copy_dt (sym->sym_dt), 1);
+		printf ("\tlet $%d: ptr = add $%d, %d\n", r, s, sym->sym_reg);
 	}
 
 	return r;
@@ -678,7 +707,7 @@ unary ()
 		printf ("\tlet $%d = -$%d;\n", r, s);
 		break;
 	default:
-		r = atom ();
+		r = member ();
 		break;
 	}
 
@@ -1238,17 +1267,17 @@ stmt ()
 	case KW_RETURN:
 		next ();
 		if (matches (TOK_SEMI)) {
-			printf ("\tret;\n");
+			printf ("\tret;\n\n");
 		} else {
 			r = rvalue (expr ());
-			printf ("\tret $%d;\n", r);
+			printf ("\tret $%d;\n\n", r);
 		}
 		expect (TOK_SEMI);
 		break;
 	case KW_GOTO:
 		next ();
 		expect (TOK_IDENT);
-		printf ("\tjmp %s;\n", lval.id);
+		printf ("\tjmp %s;\n\n", lval.id);
 		expect (TOK_SEMI);
 		break;
 	case TOK_SEMI:
