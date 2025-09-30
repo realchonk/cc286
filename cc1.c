@@ -474,6 +474,32 @@ struct symbol {
 static struct symbol *fvars = NULL, *gvars = NULL, **scope = NULL;
 
 struct symbol *
+new_sym (ns, id, dt, reg)
+enum namespace	 ns;
+char		*id;
+struct dtype	*dt;
+{
+	struct symbol *sym;
+	sym = new (struct symbol);
+	sym->sym_next	= NULL;
+	sym->sym_ns	= ns;
+	sym->sym_dt	= dt;
+	sym->sym_reg	= reg;
+	sym->sym_val	= -1;
+	copyident (sym->sym_id, id);
+	return sym;
+}
+
+void
+put_sym (head, sym)
+struct symbol **head, *sym;
+{
+	assert (sym->sym_next == NULL);
+	sym->sym_next = *head;
+	*head = sym;
+}
+
+struct symbol *
 lookup_in (head, id, ns)
 struct symbol *head;
 char *id;
@@ -1026,13 +1052,8 @@ dtype ()
 
 			if (match (TOK_LCURLY)) {
 				if (*id != '\0') {
-					sym = new (struct symbol);
-					sym->sym_next = *scope;
-					sym->sym_ns = NS_ENUM;
-					sym->sym_reg = SYM_INVALID;
-					sym->sym_dt = copy_dt (&dt_int);
-					copyident (sym->sym_id, id);
-					*scope = sym;
+					sym = new_sym (NS_ENUM, id, copy_dt (&dt_int), SYM_INVALID);
+					put_sym (scope, sym);
 				}
 
 				i = 0;
@@ -1040,17 +1061,12 @@ dtype ()
 				do {
 					if (peek () == TOK_RCURLY)
 						break;
-					expect (TOK_IDENT);
 
 					/* TODO: NAME = value */
-					sym2 = new (struct symbol);
-					sym2->sym_next = *scope;
-					sym2->sym_ns = NS_VAR;
-					sym2->sym_reg = SYM_CONST;
+					expect (TOK_IDENT);
+					sym2 = new_sym (NS_VAR, lval.id, copy_dt (&dt_int), SYM_CONST);
 					sym2->sym_val = i++;
-					sym2->sym_dt = copy_dt (&dt_int);
-					copyident (sym2->sym_id, lval.id);
-					*scope = sym2;
+					put_sym (scope, sym2);
 				} while (match (TOK_COMMA));
 
 				expect (TOK_RCURLY);
