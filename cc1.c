@@ -463,12 +463,12 @@ enum namespace {
 #define SYM_NAMED (-2)
 #define SYM_CONST (-3)
 struct symbol {
-	struct symbol *next;
-	enum namespace ns;
-	char id[MAXIDENT + 1];
-	struct dtype *dt;
-	int reg;
-	int val;
+	struct symbol	*sym_next;
+	enum namespace	 sym_ns;
+	char		 sym_id[MAXIDENT + 1];
+	struct dtype	*sym_dt;
+	int		 sym_reg;
+	int		 sym_val;
 };
 
 static struct symbol *fvars = NULL, *gvars = NULL, **scope = NULL;
@@ -479,8 +479,8 @@ struct symbol *head;
 char *id;
 enum namespace ns;
 {
-	for (; head != NULL; head = head->next) {
-		if (ns == head->ns && strcmp (head->id, id) == 0)
+	for (; head != NULL; head = head->sym_next) {
+		if (ns == head->sym_ns && strcmp (head->sym_id, id) == 0)
 			return head;
 	}
 	return NULL;
@@ -553,23 +553,23 @@ atom ()
 			}
 			errx (1, "invalid symbol: %s", lval.id);
 		}
-		switch (sym->reg) {
+		switch (sym->sym_reg) {
 		case SYM_INVALID:
 			errx (1, "cannot access %s", lval.id);
 		case SYM_NAMED:
-			r = alloc_reg (copy_dt (sym->dt), 1);
+			r = alloc_reg (copy_dt (sym->sym_dt), 1);
 			printf ("\tlet $%d: ", r);
-			print_dt (sym->dt);
-			printf (" = load %s;\n", sym->id);
+			print_dt (sym->sym_dt);
+			printf (" = load %s;\n", sym->sym_id);
 			break;
 		case SYM_CONST:
-			r = alloc_reg (copy_dt (sym->dt), 0);
+			r = alloc_reg (copy_dt (sym->sym_dt), 0);
 			printf ("\tlet $%d: ", r);
-			print_dt (sym->dt);
-			printf (" = %d;\n", sym->val);
+			print_dt (sym->sym_dt);
+			printf (" = %d;\n", sym->sym_val);
 			break;
 		default:
-			r = sym->reg;
+			r = sym->sym_reg;
 			break;
 		}
 		break;
@@ -1027,11 +1027,11 @@ dtype ()
 			if (match (TOK_LCURLY)) {
 				if (*id != '\0') {
 					sym = new (struct symbol);
-					sym->next = *scope;
-					sym->ns = NS_ENUM;
-					sym->reg = SYM_INVALID;
-					sym->dt = copy_dt (&dt_int);
-					copyident (sym->id, id);
+					sym->sym_next = *scope;
+					sym->sym_ns = NS_ENUM;
+					sym->sym_reg = SYM_INVALID;
+					sym->sym_dt = copy_dt (&dt_int);
+					copyident (sym->sym_id, id);
 					*scope = sym;
 				}
 
@@ -1044,12 +1044,12 @@ dtype ()
 
 					/* TODO: NAME = value */
 					sym2 = new (struct symbol);
-					sym2->next = *scope;
-					sym2->ns = NS_VAR;
-					sym2->reg = SYM_CONST;
-					sym2->val = i++;
-					sym2->dt = copy_dt (&dt_int);
-					copyident (sym2->id, lval.id);
+					sym2->sym_next = *scope;
+					sym2->sym_ns = NS_VAR;
+					sym2->sym_reg = SYM_CONST;
+					sym2->sym_val = i++;
+					sym2->sym_dt = copy_dt (&dt_int);
+					copyident (sym2->sym_id, lval.id);
 					*scope = sym2;
 				} while (match (TOK_COMMA));
 
@@ -1166,8 +1166,8 @@ enum level lvl;
 
 	switch (next ()) {
 	case TOK_IDENT:
-		sym->dt = ptr_dt (*dt, 0);
-		copyident (sym->id, lval.id);
+		sym->sym_dt = ptr_dt (*dt, 0);
+		copyident (sym->sym_id, lval.id);
 		break;
 	case TOK_STAR:
 		*dt = ptr_dt (*dt, 0);
@@ -1198,7 +1198,7 @@ struct symbol *sym;
 	fvars = NULL;
 	gvars = sym;
 
-	printf ("fn %s() {\n", sym->id);
+	printf ("fn %s() {\n", sym->sym_id);
 
 	expect (TOK_LCURLY);
 	scope = &fvars;
@@ -1229,8 +1229,8 @@ enum level lvl;
 		/* TODO: arguments */
 		expect (TOK_RPAR);
 		ndt = new_dt (DT_FUNC);
-		ndt->dt_inner = sym->dt;
-		sym->dt = ndt;
+		ndt->dt_inner = sym->sym_dt;
+		sym->sym_dt = ndt;
 
 		if (lvl == LVL_GLOBAL_TOP && is_func_begin ()) {
 			func (sym);
@@ -1265,7 +1265,7 @@ enum level lvl;
 
 	do {
 		sym = new (struct symbol);
-		sym->next = *scope;
+		sym->sym_next = *scope;
 		dt2 = copy_dt (dt);
 
 		if (decl1 (&dt2, sym, lvl)) {
@@ -1275,30 +1275,30 @@ enum level lvl;
 			switch (lvl) {
 			case LVL_GLOBAL_TOP:
 			case LVL_GLOBAL:
-				switch (sym->dt->dt_type) {
+				switch (sym->sym_dt->dt_type) {
 				case DT_PTR:
-					printf ("static %s: ", sym->id);
-					print_dt (sym->dt->dt_inner);
+					printf ("static %s: ", sym->sym_id);
+					print_dt (sym->sym_dt->dt_inner);
 					printf (";\n\n");
 					break;
 				case DT_FUNC:
-					printf ("# extern %s;\n", sym->id);
+					printf ("# extern %s;\n", sym->sym_id);
 					break;
 				default:
 					abort ();
 				}
-				sym->reg = SYM_NAMED;
+				sym->sym_reg = SYM_NAMED;
 				break;
 			case LVL_LOCAL:
-				switch (sym->dt->dt_type) {
+				switch (sym->sym_dt->dt_type) {
 				case DT_PTR:
-					sym->reg = alloc_reg (sym->dt, 1);
+					sym->sym_reg = alloc_reg (sym->sym_dt, 1);
 					printf ("\tlet $%d: ptr = alloc %d;\t# %s\n",
-							sym->reg, sizeof_dt (sym->dt->dt_inner), sym->id);
+						sym->sym_reg, sizeof_dt (sym->sym_dt->dt_inner), sym->sym_id);
 					break;
 				case DT_FUNC:
-					sym->reg = SYM_NAMED;
-					printf ("\t# extern %s;\n", sym->id);
+					sym->sym_reg = SYM_NAMED;
+					printf ("\t# extern %s;\n", sym->sym_id);
 					break;
 				default:
 					abort ();
