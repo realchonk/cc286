@@ -471,7 +471,7 @@ struct symbol {
 	int		 sym_val;
 };
 
-static struct symbol *fvars = NULL, *gvars = NULL, **scope = NULL;
+static struct symbol *fvars = NULL, *gvars = NULL;
 
 struct symbol *
 new_sym (ns, id, dt, reg)
@@ -999,7 +999,8 @@ enum base_type {
 };
 
 struct dtype *
-dtype ()
+dtype (scope)
+struct symbol **scope;
 {
 	enum base_type base = BT_UNKNOWN;
 	struct symbol *sym = NULL, *sym2;
@@ -1106,7 +1107,8 @@ done:
 }
 
 struct dtype *
-try_dtype ()
+try_dtype (scope)
+struct symbol **scope;
 {
 	switch (peek ()) {
 	case KW_SIGNED:
@@ -1116,7 +1118,7 @@ try_dtype ()
 	case KW_INT:
 	case KW_LONG:
 	case KW_ENUM:
-		return dtype ();
+		return dtype (scope);
 	default:
 		return NULL;
 	}
@@ -1218,9 +1220,8 @@ struct symbol *sym;
 	printf ("fn %s() {\n", sym->sym_id);
 
 	expect (TOK_LCURLY);
-	scope = &fvars;
 
-	while (decl (LVL_LOCAL));
+	while (decl (LVL_LOCAL, &fvars));
 
 	while (peek () != TOK_RCURLY)
 		stmt ();
@@ -1228,8 +1229,6 @@ struct symbol *sym;
 	expect (TOK_RCURLY);
 	printf ("}\n\n");
 	reset_regs ();
-
-	scope = &gvars;
 }
 
 int
@@ -1261,13 +1260,14 @@ enum level lvl;
 }
 
 int
-decl (lvl)
-enum level lvl;
+decl (lvl, scope)
+enum level	  lvl;
+struct symbol	**scope;
 {
 	struct symbol *sym;
 	struct dtype *dt, *dt2;
 
-	dt = try_dtype ();
+	dt = try_dtype (scope);
 	if (dt == NULL) {
 		if (lvl == LVL_GLOBAL || lvl == LVL_GLOBAL_TOP) {
 			dt = copy_dt (&dt_int);
@@ -1337,8 +1337,7 @@ int main ()
 	cm = CM_SMALL;
 	memset (regs, 0, sizeof (regs));
 	while (peek () != TOK_EOF) {
-		scope = &gvars;
-		decl (LVL_GLOBAL_TOP);
+		decl (LVL_GLOBAL_TOP, &gvars);
 	}
 	return 0;
 }
