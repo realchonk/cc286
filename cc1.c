@@ -337,7 +337,7 @@ struct dtype *dt;
 			return 4;
 		}
 	case DT_LBL:
-		// TODO: code models
+		/* TODO: code models */
 		unreachable ("DT_LBL");
 	case DT_CHAR:
 	case DT_SCHAR:
@@ -923,7 +923,7 @@ tern ()
 	printf ("\tjmp $%d;\n\n", le);
 	
 	printf ("%d:\n", le);
-	// TODO: check for common type
+	/* TODO: check for common type */
 	r = alloc_reg (copy_dt (regs[a].r_dt), 0);
 	printf ("\tlet $%d: ", r);
 	print_dt (regs[r].r_dt);
@@ -1030,7 +1030,7 @@ dtype ()
 						break;
 					expect (TOK_IDENT);
 
-					// TODO: NAME = value
+					/* TODO: NAME = value */
 					sym2 = new (struct symbol);
 					sym2->next = *scope;
 					sym2->ns = NS_VAR;
@@ -1128,7 +1128,7 @@ stmt ()
 enum level {
 	L_GLOBAL_TOP,
 	L_GLOBAL,
-	// L_ARGS,
+	/* L_ARGS, */
 	L_LOCAL,
 };
 
@@ -1182,7 +1182,7 @@ struct symbol *sym;
 {
 	int decl ();
 
-	// TODO: free fvars
+	/* TODO: free fvars */
 	fvars = NULL;
 	gvars = sym;
 
@@ -1214,7 +1214,7 @@ enum level lvl;
 	decl2 (dt, sym, lvl);
 
 	if (match (TOK_LPAR)) {
-		// TODO: arguments
+		/* TODO: arguments */
 		expect (TOK_RPAR);
 		ndt = new (struct dtype);
 		ndt->type = DT_FUNC;
@@ -1229,7 +1229,7 @@ enum level lvl;
 
 	}
 
-	// TODO: arrays
+	/* TODO: arrays */
 
 	return 0;
 }
