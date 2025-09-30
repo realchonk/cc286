@@ -285,6 +285,17 @@ struct dtype *dt;
 	}
 }
 
+struct dtype *
+new_dt (type)
+enum dtype_type type;
+{
+	struct dtype *dt;
+	dt = new (struct dtype);
+	dt->type = type;
+	dt->refcnt = 1;
+	return dt;
+}
+
 void
 free_dt (dt)
 struct dtype *dt;
@@ -360,9 +371,7 @@ struct dtype *inner;
 {
 	struct dtype *ptr;
 
-	ptr = new (struct dtype);
-	ptr->type = DT_PTR;
-	ptr->refcnt = 1;
+	ptr = new_dt (DT_PTR);
 	ptr->inner = inner;
 
 	if (inc)
@@ -1216,10 +1225,8 @@ enum level lvl;
 	if (match (TOK_LPAR)) {
 		/* TODO: arguments */
 		expect (TOK_RPAR);
-		ndt = new (struct dtype);
-		ndt->type = DT_FUNC;
+		ndt = new_dt (DT_FUNC);
 		ndt->inner = sym->dt;
-		ndt->refcnt = 1;
 		sym->dt = ndt;
 
 		if (lvl == L_GLOBAL_TOP && is_func_begin ()) {
