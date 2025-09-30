@@ -1138,10 +1138,10 @@ stmt ()
 }
 
 enum level {
-	L_GLOBAL_TOP,
-	L_GLOBAL,
-	/* L_ARGS, */
-	L_LOCAL,
+	LVL_GLOBAL_TOP,
+	LVL_GLOBAL,
+	/* LVL_ARGS, */
+	LVL_LOCAL,
 };
 
 enum level
@@ -1149,8 +1149,8 @@ lvl_decay (lvl)
 enum level lvl;
 {
 	switch (lvl) {
-	case L_GLOBAL_TOP:
-		return L_GLOBAL;
+	case LVL_GLOBAL_TOP:
+		return LVL_GLOBAL;
 	default:
 		return lvl;
 	}
@@ -1203,7 +1203,7 @@ struct symbol *sym;
 	expect (TOK_LCURLY);
 	scope = &fvars;
 
-	while (decl (L_LOCAL));
+	while (decl (LVL_LOCAL));
 
 	while (peek () != TOK_RCURLY)
 		stmt ();
@@ -1232,7 +1232,7 @@ enum level lvl;
 		ndt->dt_inner = sym->dt;
 		sym->dt = ndt;
 
-		if (lvl == L_GLOBAL_TOP && is_func_begin ()) {
+		if (lvl == LVL_GLOBAL_TOP && is_func_begin ()) {
 			func (sym);
 			return 1;
 		}
@@ -1253,7 +1253,7 @@ enum level lvl;
 
 	dt = try_dtype ();
 	if (dt == NULL) {
-		if (lvl == L_GLOBAL || lvl == L_GLOBAL_TOP) {
+		if (lvl == LVL_GLOBAL || lvl == LVL_GLOBAL_TOP) {
 			dt = copy_dt (&dt_int);
 		} else {
 			return 0;
@@ -1273,8 +1273,8 @@ enum level lvl;
 			return 1;
 		} else {
 			switch (lvl) {
-			case L_GLOBAL_TOP:
-			case L_GLOBAL:
+			case LVL_GLOBAL_TOP:
+			case LVL_GLOBAL:
 				switch (sym->dt->dt_type) {
 				case DT_PTR:
 					printf ("static %s: ", sym->id);
@@ -1289,7 +1289,7 @@ enum level lvl;
 				}
 				sym->reg = SYM_NAMED;
 				break;
-			case L_LOCAL:
+			case LVL_LOCAL:
 				switch (sym->dt->dt_type) {
 				case DT_PTR:
 					sym->reg = alloc_reg (sym->dt, 1);
@@ -1322,7 +1322,7 @@ int main ()
 	cm = CM_SMALL;
 	memset (regs, 0, sizeof (regs));
 	while (peek () != TOK_EOF) {
-		decl (L_GLOBAL_TOP);
+		decl (LVL_GLOBAL_TOP);
 	}
 	return 0;
 }
