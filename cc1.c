@@ -1250,6 +1250,9 @@ enum level lvl;
 		}
 	}
 
+	if (peek () == TOK_SEMI)
+		goto end;
+
 	do {
 		sym = new (struct symbol);
 		sym->next = *scope;
@@ -1296,6 +1299,7 @@ enum level lvl;
 		*scope = sym;
 	} while (match (TOK_COMMA));
 
+end:
 	free_dt (dt);
 	expect (TOK_SEMI);
 	return 1;

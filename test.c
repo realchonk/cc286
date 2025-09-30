@@ -59,11 +59,19 @@ labels ()
 enum {
 	A,
 	B,
-} x;
+};
+
+enum log_level {
+	DEBUG,
+	INFO,
+	ERROR,
+};
 
 enums ()
 {
+	enum log_level lvl;
+
 	return A;
 	return B;
-	return x;
+	return lvl;
 }
