@@ -53,6 +53,7 @@ enum token_type {
 	KW_GOTO,
 	KW_ENUM,
 	KW_STRUCT,
+	KW_UNION,
 
 	TOK_EOF,
 };
@@ -114,6 +115,8 @@ begin:	do {
 			return KW_ENUM;
 		} else if (strcmp (lval.id, "struct") == 0) {
 			return KW_STRUCT;
+		} else if (strcmp (lval.id, "union") == 0) {
+			return KW_UNION;
 		} else {
 			return TOK_IDENT;
 		}
@@ -233,6 +236,7 @@ enum dtype_type {
 	DT_LONG,
 	DT_ULONG,
 	DT_STRUCT,
+	DT_UNION,
 };
 
 struct structure {
@@ -305,6 +309,7 @@ struct dtype *dt;
 		printf ("dword");
 		break;
 	case DT_STRUCT:
+	case DT_UNION:
 		unreachable ("struct/union");
 	}
 }
@@ -347,6 +352,7 @@ struct dtype *dt;
 	case DT_ULONG:
 		break;
 	case DT_STRUCT:
+	case DT_UNION:
 		/* TODO: free members */
 		free (dt->dt_su);
 		break;
@@ -391,6 +397,7 @@ struct dtype *dt;
 	case DT_ULONG:
 		return 4;
 	case DT_STRUCT:
+	case DT_UNION:
 		return dt->dt_su->su_size;
 	}
 }
@@ -485,6 +492,7 @@ enum namespace {
 	NS_VAR,
 	NS_ENUM,
 	NS_STRUCT,
+	NS_UNION,
 };
 
 #define SYM_INVALID (-1)
@@ -713,6 +721,7 @@ promote (a)
 	case DT_LONG:
 	case DT_ULONG:
 	case DT_STRUCT:
+	case DT_UNION:
 		r = a;
 		break;
 	}
@@ -1026,6 +1035,7 @@ enum base_type {
 	BT_LONG,
 	BT_ENUM,
 	BT_STRUCT,
+	BT_UNION,
 };
 
 enum level {
@@ -1034,17 +1044,21 @@ enum level {
 	/* LVL_ARGS, */
 	LVL_LOCAL,
 	LVL_STRUCT,
+	LVL_UNION,
 };
 
 struct dtype *
 dtype (scope)
 struct symbol **scope;
 {
-	enum base_type base = BT_UNKNOWN;
-	struct symbol *sym = NULL, *sym2;
-	struct dtype *dt;
-	char id[MAXIDENT + 1];
-	int i, flags = 0, decl ();
+	enum base_type	 base = BT_UNKNOWN;
+	enum level	 lvl;
+	enum dtype_type	 dtt;
+	enum namespace	 ns;
+	struct symbol	*sym = NULL, *sym2;
+	struct dtype	*dt;
+	char		 id[MAXIDENT + 1];
+	int		 i, flags = 0, decl ();
 
 	for (flags = 0; ;) {
 		switch (peek ()) {
@@ -1117,6 +1131,17 @@ struct symbol **scope;
 			expect (TOK_RCURLY);
 			break;
 		case KW_STRUCT:
+			lvl = LVL_STRUCT;
+			dtt = DT_STRUCT;
+			ns = NS_STRUCT;
+			goto common_su;
+		case KW_UNION:
+			lvl = LVL_UNION;
+			dtt = DT_UNION;
+			ns = NS_UNION;
+			goto common_su;
+	
+		common_su:
 			next ();
 			if (base != BT_UNKNOWN)
 				errx (1, "type error");
@@ -1130,21 +1155,21 @@ struct symbol **scope;
 			}
 
 			if (!match (TOK_LCURLY)) {
-				sym = lookup (id, NS_STRUCT);
+				sym = lookup (id, ns);
 				if (sym == NULL)
 					errx (1, "invalid struct/union: '%s'", id);
 				dt = sym->sym_dt;
 				break;
 			}
 
-			dt = new_dt (DT_STRUCT);
+			dt = new_dt (dtt);
 			dt->dt_su = new (struct structure);
 			dt->dt_su->su_members = NULL;
 			dt->dt_su->su_size = 0;
 			copyident (dt->dt_su->su_id, id);
 
 			while (!match (TOK_RCURLY)) {
-				decl (LVL_STRUCT, &dt->dt_su->su_members, &dt->dt_su->su_size);
+				decl (lvl, &dt->dt_su->su_members, &dt->dt_su->su_size);
 			}
 
 			if (*id != '\0') {
@@ -1180,6 +1205,7 @@ done:
 	case BT_ENUM:
 		return copy_dt (&dt_int);
 	case BT_STRUCT:
+	case BT_UNION:
 		return dt;
 	}
 }
@@ -1197,6 +1223,7 @@ struct symbol **scope;
 	case KW_LONG:
 	case KW_ENUM:
 	case KW_STRUCT:
+	case KW_UNION:
 		return dtype (scope);
 	default:
 		return NULL;
@@ -1337,9 +1364,9 @@ enum level	  lvl;
 struct symbol	**scope;
 void		 *arg;
 {
-	struct symbol *sym;
-	struct dtype *dt, *dt2;
-	size_t *addr;
+	struct symbol	*sym;
+	struct dtype	*dt, *dt2;
+	size_t		*addr, sz;
 
 	dt = try_dtype (scope);
 	if (dt == NULL) {
@@ -1398,6 +1425,13 @@ void		 *arg;
 			addr = (size_t *)arg;
 			sym->sym_reg = *addr;
 			*addr += sizeof_dt (sym->sym_dt);
+			break;
+		case LVL_UNION:
+			addr = (size_t *)arg;
+			sym->sym_reg = 0;
+			sz = sizeof_dt (sym->sym_dt);
+			if (sz > *addr)
+				*addr = sz;
 			break;
 		}
 

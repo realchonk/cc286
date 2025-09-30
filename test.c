@@ -83,5 +83,9 @@ struct stat {
 
 structs ()
 {
+	union {
+		int x;
+		long z;
+	} u, *u_ptr;
 	struct stat st, *st_ptr;
 }
