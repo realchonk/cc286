@@ -206,6 +206,13 @@ enum token_type exp;
 	return peek () == exp ? next (), 1 : 0;
 }
 
+int
+matches (exp)
+enum token_type exp;
+{
+	return peek () == exp;
+}
+
 /* TYPE SYSTEM */
 
 enum dtype_type {
@@ -1061,7 +1068,7 @@ struct symbol **scope;
 				i = 0;
 
 				do {
-					if (peek () == TOK_RCURLY)
+					if (matches (TOK_RCURLY))
 						break;
 
 					/* TODO: NAME = value */
@@ -1131,7 +1138,7 @@ stmt ()
 	switch (peek ()) {
 	case KW_RETURN:
 		next ();
-		if (peek () == TOK_SEMI) {
+		if (matches (TOK_SEMI)) {
 			printf ("\tret;\n");
 		} else {
 			r = rvalue (expr ());
@@ -1204,7 +1211,7 @@ enum level lvl;
 int
 is_func_begin ()
 {
-	return peek () == TOK_LCURLY;
+	return matches (TOK_LCURLY);
 }
 
 void
@@ -1223,7 +1230,7 @@ struct symbol *sym;
 
 	while (decl (LVL_LOCAL, &fvars));
 
-	while (peek () != TOK_RCURLY)
+	while (!matches (TOK_RCURLY))
 		stmt ();
 
 	expect (TOK_RCURLY);
@@ -1276,7 +1283,7 @@ struct symbol	**scope;
 		}
 	}
 
-	if (peek () == TOK_SEMI)
+	if (matches (TOK_SEMI))
 		goto end;
 
 	do {
@@ -1336,8 +1343,7 @@ int main ()
 {
 	cm = CM_SMALL;
 	memset (regs, 0, sizeof (regs));
-	while (peek () != TOK_EOF) {
+	while (!matches (TOK_EOF))
 		decl (LVL_GLOBAL_TOP, &gvars);
-	}
 	return 0;
 }
