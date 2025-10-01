@@ -81,6 +81,11 @@ struct stat {
 	unsigned long	st_size;
 };
 
+struct file {
+	char		*f_name;
+	struct stat	*f_st;
+};
+
 structs ()
 {
 	union {
@@ -88,8 +93,10 @@ structs ()
 		long z;
 	} u, *u_ptr;
 	struct stat st, *st_ptr;
+	struct file *f;
 
 	return st.st_mode;
 	return &st.st_size;
-	return u.x + u.z;
+	return u.x + u_ptr->x;
+	return f->f_st->st_mode;
 }

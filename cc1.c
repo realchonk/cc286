@@ -43,6 +43,7 @@ enum token_type {
 	TOK_QMARK,
 	TOK_COLON,
 	TOK_PERIOD,
+	TOK_ARROW,
 
 	KW_RETURN,
 	KW_SIGNED,
@@ -139,7 +140,13 @@ begin:	do {
 	case '+':
 		return TOK_PLUS;
 	case '-':
-		return TOK_MINUS;
+		ch = getchar ();
+		if (ch == '>') {
+			return TOK_ARROW;
+		} else {
+			ungetc (ch, stdin);
+			return TOK_MINUS;
+		}
 	case '*':
 		return TOK_STAR;
 	case '/':
@@ -659,21 +666,33 @@ int member ()
 
 	r = atom ();
 
-	if (match (TOK_PERIOD)) {
-		s = lvalue (r);
-		dt = regs[r].r_dt->dt_inner;
-		assert (dt->dt_type == DT_STRUCT || dt->dt_type == DT_UNION);
+	while (1) {
+		switch (peek ()) {
+		case TOK_PERIOD:
+			s = lvalue (r);
+			goto common;
 
-		expect (TOK_IDENT);
-		sym = lookup_in (dt->dt_su->su_members, lval.id, NS_VAR);
-		if (sym == NULL)
-			errx (1, "no member '%s' for struct/union '%s'", lval.id, dt->dt_su->su_id);
+		case TOK_ARROW:
+			s = rvalue (r);
+			goto common;
 
-		r = alloc_reg (copy_dt (sym->sym_dt), 1);
-		printf ("\tlet $%d: ptr = add $%d, %d\n", r, s, sym->sym_reg);
+		common:
+			next ();
+			dt = regs[s].r_dt->dt_inner;
+			assert (dt->dt_type == DT_STRUCT || dt->dt_type == DT_UNION);
+
+			expect (TOK_IDENT);
+			sym = lookup_in (dt->dt_su->su_members, lval.id, NS_VAR);
+			if (sym == NULL)
+				errx (1, "no member '%s' for struct/union '%s'", lval.id, dt->dt_su->su_id);
+
+			r = alloc_reg (copy_dt (sym->sym_dt), 1);
+			printf ("\tlet $%d: ptr = add $%d, %d\n", r, s, sym->sym_reg);
+			break;
+		default:
+			return r;
+		}
 	}
-
-	return r;
 }
 
 int
