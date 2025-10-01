@@ -434,7 +434,8 @@ void
 assert_dt_eq (dta, dtb)
 struct dtype *dta, *dtb;
 {
-	assert (dta->dt_type == dtb->dt_type);
+	if (dta->dt_type != dtb->dt_type)
+		errx (1, "assert_dt_eq(): %d != %d", dta->dt_type, dtb->dt_type);
 
 	switch (dta->dt_type) {
 	case DT_PTR:
@@ -603,7 +604,7 @@ lvalue (r)
 {
 	if (!regs[r].r_is_lv)
 		errx (1, "must be an lvalue");
-	assert (regs[r].r_dt->dt_type == DT_PTR);
+	assert (regs[r].r_dt->dt_type == DT_PTR || regs[r].r_dt->dt_type == DT_FUNC);
 	return r;
 }
 
@@ -1386,6 +1387,8 @@ struct symbol *sym;
 
 	/* TODO: free fvars */
 	fvars = NULL;
+
+	sym->sym_reg = SYM_NAMED;
 	put_sym (&gvars, sym);
 
 	printf ("fn %s() {\n", sym->sym_id);
