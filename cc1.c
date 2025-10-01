@@ -44,6 +44,7 @@ enum token_type {
 	TOK_COLON,
 	TOK_PERIOD,
 	TOK_ARROW,
+	TOK_EQ,
 
 	KW_RETURN,
 	KW_SIGNED,
@@ -173,6 +174,8 @@ begin:	do {
 		return TOK_COLON;
 	case '.':
 		return TOK_PERIOD;
+	case '=':
+		return TOK_EQ;
 	case EOF:
 		return TOK_EOF;
 	default:
@@ -1022,7 +1025,7 @@ end:
 int
 tern ()
 {
-	int r, a, b, lt, lf, le;
+	int r, a, b, lt, lf, le, assign ();
 
 	r = add ();
 
@@ -1044,7 +1047,7 @@ tern ()
 	expect (TOK_COLON);
 
 	printf ("%d:\n", lf);
-	b = promote (rvalue (expr ()));
+	b = promote (rvalue (assign ()));
 	printf ("\tjmp $%d;\n\n", le);
 	
 	printf ("%d:\n", le);
@@ -1057,11 +1060,32 @@ tern ()
 }
 
 int
+assign ()
+{
+	int l, r;
+
+	l = tern ();
+
+	if (!match (TOK_EQ))
+		return l;
+
+	l = lvalue (l);
+	r = rvalue (assign ());
+	/* TODO: implicit cast */
+
+	assert_dt_eq (regs[l].r_dt->dt_inner, regs[r].r_dt);
+
+	printf ("\twrite $%d, $%d;\n", l, r);
+
+	return l;
+}
+
+int
 comma ()
 {
 	int r;
 	do {
-		r = tern ();
+		r = assign ();
 	} while (match (TOK_COMMA));
 	return r;
 }

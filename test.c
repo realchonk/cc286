@@ -100,3 +100,15 @@ structs ()
 	return u.x + u_ptr->x;
 	return f->f_st->st_mode;
 }
+
+// recurse ()
+// {
+// 	return recurse ();
+// }
+
+write ()
+{
+	int x, z;
+	x = z = 1;
+	return x;
+}
