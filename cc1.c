@@ -1347,32 +1347,6 @@ enum level lvl;
 	}
 }
 
-void
-decl2 (dt, sym, lvl)
-struct dtype **dt;
-struct symbol *sym;
-enum level lvl;
-{
-	extern int decl1 ();
-
-	switch (next ()) {
-	case TOK_IDENT:
-		sym->sym_dt = ptr_dt (*dt, 0);
-		copyident (sym->sym_id, lval.id);
-		break;
-	case TOK_STAR:
-		*dt = ptr_dt (*dt, 0);
-		decl2 (dt, sym, lvl);
-		break;
-	case TOK_LPAR:
-		decl1 (dt, sym, lvl_decay (lvl));
-		expect (TOK_RPAR);
-		break;
-	default:
-		errx (1, "expected declaration");
-	}
-}
-
 int
 is_func_begin ()
 {
@@ -1403,6 +1377,32 @@ struct symbol *sym;
 	expect (TOK_RCURLY);
 	printf ("}\n\n");
 	reset_regs ();
+}
+
+void
+decl2 (dt, sym, lvl)
+struct dtype **dt;
+struct symbol *sym;
+enum level lvl;
+{
+	extern int decl1 ();
+
+	switch (next ()) {
+	case TOK_IDENT:
+		sym->sym_dt = ptr_dt (*dt, 0);
+		copyident (sym->sym_id, lval.id);
+		break;
+	case TOK_STAR:
+		*dt = ptr_dt (*dt, 0);
+		decl2 (dt, sym, lvl);
+		break;
+	case TOK_LPAR:
+		decl1 (dt, sym, lvl_decay (lvl));
+		expect (TOK_RPAR);
+		break;
+	default:
+		errx (1, "expected declaration");
+	}
 }
 
 int

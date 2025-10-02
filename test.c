@@ -52,9 +52,8 @@ int var, func () {
 labels ()
 {
 	goto lbl;
-	return lbl:, 0;
+	return 1, lbl:, 0;
 }
-
 
 enum {
 	A,
