@@ -1014,7 +1014,7 @@ char *instr;
 	print_dt (dta);
 	printf (" = %c%s $%d, $%d;\n", prefix, instr, a, b);
 
-	return a;
+	return r;
 }
 
 int
