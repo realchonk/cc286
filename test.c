@@ -107,3 +107,21 @@ write ()
 	return x;
 }
 
+useful ()
+{
+	int x, *y, **z;
+
+	x = 1;
+	y = &x;
+	z = &y;
+
+	*y = *y + 1;
+	**z = **z + 1;
+	return x + *y + **z;
+}
+
+muldivmod ()
+{
+	return 1 * 2 / 3 % 4;
+}
+

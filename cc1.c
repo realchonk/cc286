@@ -35,6 +35,7 @@ enum token_type {
 	TOK_MINUS,
 	TOK_STAR,
 	TOK_SLASH,
+	TOK_PERC,
 	TOK_LPAR,
 	TOK_RPAR,
 	TOK_LCURLY,
@@ -168,6 +169,8 @@ begin:	do {
 			ungetc (ch, stdin);
 			return TOK_SLASH;
 		}
+	case '%':
+		return TOK_PERC;
 	case '?':
 		return TOK_QMARK;
 	case ':':
@@ -991,12 +994,69 @@ do_sub (a, b)
 }
 
 int
+do_mdm (instr, a, b)
+char *instr;
+{
+	struct dtype	*dta, *dtb;
+	char		 prefix;
+	int		 r;
+
+	promote2 (&a, &b);
+	dta = regs[a].r_dt;
+	dtb = regs[b].r_dt;
+	assert_dt_eq (dta, dtb);
+
+	prefix = is_signed (dta) ? 's' : 'u';
+
+	r = alloc_reg (copy_dt (dta), 0);
+
+	printf ("\tlet $%d: ", r);
+	print_dt (dta);
+	printf (" = %c%s $%d, $%d;\n", prefix, instr, a, b);
+
+	return a;
+}
+
+int
+mul ()
+{
+	int r, a, b;
+	char *instr;
+
+	r = unary ();
+
+	while (1) {
+		switch (peek ()) {
+		case TOK_STAR:
+			instr = "mul";
+			break;
+		case TOK_SLASH:
+			instr = "div";
+			break;
+		case TOK_PERC:
+			instr = "mod";
+			break;
+		default:
+			return r;
+		}
+
+		next ();
+
+		a = rvalue (r);
+		b = rvalue (unary ());
+		a = promote (a);
+		b = promote (b);
+		r = do_mdm (instr, a, b);
+	}
+}
+
+int
 add ()
 {
 	int r, a, b;
 	char op;
 
-	r = unary ();
+	r = mul ();
 
 	while (1) {
 		switch (peek ()) {
@@ -1007,20 +1067,17 @@ add ()
 			op = '-';
 			break;
 		default:
-			goto end;
+			return r;
 		}
 
 		next ();
 
 		a = rvalue (r);
-		b = rvalue (unary ());
+		b = rvalue (mul ());
 		a = promote (a);
 		b = promote (b);
 		r = op == '+' ? do_add (a, b) : do_sub (a, b);
 	}
-
-end:
-	return r;
 }
 
 int
